@@ -1,0 +1,100 @@
+
+╭───────────────── Avaliação da Startup ─────────────────╮
+│ 5/5 - Excepcional - prioridade máxima, agendar reunião │
+╰────────────────────────────────────────────────────────╯
+ Pitch Deck:            Pitch-deck-HARUMI-us-(3).pdf 
+ Estágio Identificado:  PRE_SEED                     
+
+Informações Extraídas:
+  Nome:              HARUMI                                            
+  Localização:       Brasil                                            
+  Receita Anual:     Projetado: 200k usd ARR até Jun/26. Atual: null.  
+  Tamanho Rodada:    Buscando rodada Pre-seed de 500k USD.             
+  Valuation:         5M USD                                            
+
+Justificativa:
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ A HARUMI apresenta um alinhamento excepcional com os critérios do fundo para │
+│ o estágio Pre-Seed, destacando-se como uma oportunidade de prioridade máxima │
+│ para reunião. O ponto mais forte e diferenciador da startup é sua equipe     │
+│ fundadora. Miriam Koga, Marcel Nicolay e Ricardo Leao trazem uma combinação  │
+│ rara de experiência em escalabilidade de vendas, desenvolvimento de produtos │
+│ tecnológicos complexos com foco em desenvolvedores (CTO com passagens por    │
+│ Malga, Gympass, Zoop), e profunda expertise em pesquisa operacional e        │
+│ algoritmos de otimização, com histórico comprovado em startups de sucesso e  │
+│ grandes corporações. Essa composição de time é um fator crítico para a       │
+│ execução bem-sucedida em um estágio tão inicial.                             │
+│                                                                              │
+│ Do ponto de vista de produto e mercado, a HARUMI está atacando uma dor       │
+│ significativa em um mercado gigantesco (US$ 45 bilhões em custos             │
+│ operacionais otimizáveis só nos EUA), com uma proposta de valor clara:       │
+│ democratizar a otimização matemática avançada em tempo real através de IA    │
+│ proprietária. O modelo SaaS com ticket médio elevado e a ambição de cobrar   │
+│ sobre a economia gerada indicam um potencial de receita e escalabilidade     │
+│ muito atraente. Embora o MVP tenha sido lançado recentemente e a receita     │
+│ atual seja nula (conforme esperado para Pre-Seed), a startup já demonstra    │
+│ tração inicial por meio de uma comunidade ativa de 150 profissionais de      │
+│ pesquisa operacional de grandes empresas que estão validando o produto, e um │
+│ roadmap claro para aquisição de clientes pagantes e parcerias estratégicas.  │
+│                                                                              │
+│ As métricas financeiras da rodada proposta (500k USD buscando 5M USD de      │
+│ valuation pre-money) estão perfeitamente alinhadas com a tese de             │
+│ investimento Pre-Seed do fundo, resultando em uma diluição saudável para os  │
+│ fundadores (~9%). A projeção de 200k USD ARR até Jun/26, embora possa ter    │
+│ uma pequena inconsistência com o ticket médio de 70k USD/ano em termos de    │
+│ número de clientes (o que pode ser facilmente esclarecido), demonstra uma    │
+│ visão de crescimento e validação de PMF nos próximos 18-24 meses, um         │
+│ critério chave para este estágio.                                            │
+│                                                                              │
+│ Os principais pontos de atenção são inerentes ao estágio Pre-Seed: a         │
+│ ausência de receita atual e a necessidade de comprovar o Product-Market Fit  │
+│ com clientes pagantes. Além disso, uma visão mais detalhada do Cap Table     │
+│ seria benéfica para avaliar a diluição total dos fundadores. No entanto,     │
+│ esses gaps são amplamente mitigados pela qualidade excepcional da equipe, a  │
+│ clareza da visão de produto e mercado, e o potencial de retorno alinhado com │
+│ a tese do fundo. A HARUMI representa uma oportunidade de investimento de     │
+│ alto potencial, com um time estelar e uma visão ambiciosa para um problema   │
+│ de mercado relevante.                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+✓ Pontos Positivos:
+  • Time Excepcional: Fundadores com experiência relevante e comprovada em 
+startups de sucesso (TRACTIAN, Malga, Gympass) e grandes empresas, com expertise
+técnica e de negócios.
+  • Mercado Grande e Bem Definido: Atende uma dor real em setores industriais 
+com alto potencial de otimização (US$ 45B apenas nos EUA). Crescimento da 
+pesquisa operacional.
+  • Tecnologia e Diferencial: Plataforma de IA proprietária que torna a 
+otimização matemática avançada acessível e escalável, superando consultorias e 
+soluções limitadas.
+  • Validação Inicial: Comunidade de 150 profissionais de grandes empresas já 
+engajada na validação do produto.
+  • Rodada e Valuation Adequados: O tamanho da rodada e o valuation pre-money 
+estão perfeitamente alinhados com os critérios de Pre-Seed do fundo. A diluição 
+para a rodada atual é baixa (cerca de 9%).
+  • Modelo de Negócio Potencialmente Lucrativo: SaaS com ticket médio alto (70k 
+USD/ano) e potencial para cobrar porcentagem da economia gerada, almejando 1bi 
+USD de ARR.
+
+✗ Pontos Negativos:
+  • Ausência de Receita Atual: Embora esperado para Pre-Seed, é um risco 
+inerente a essa fase. A projeção de 200k USD ARR para Jun/26 com 10 clientes (o 
+que daria 700k USD ARR com o ticket médio informado) precisa de mais clareza.
+  • Cap Table Detalhada: Não há informações sobre a composição do Cap Table 
+(participação dos fundadores vs. ESOP vs. investidores anjo) além da diluição da
+rodada atual.
+  • MVP Recém-Lançado: O MVP foi lançado em fevereiro de 2025, o que significa 
+que a tração real de clientes pagantes ainda precisa ser comprovada.
+  • Métricas de PMF: Ainda não há métricas de PMF (NPS, retenção, churn) pois o 
+produto está no início da validação.
+
+Critérios Atendidos:
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Critério            ┃ Status ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ Localizacao         │ ✓ Sim  │
+│ Estagio Adequado    │ ✓ Sim  │
+│ Metricas Financeiro │ ✓ Sim  │
+│ Produto Tracao      │ ✓ Sim  │
+│ Equipe              │ ✓ Sim  │
+└─────────────────────┴────────┘
