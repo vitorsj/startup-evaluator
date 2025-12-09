@@ -8,6 +8,8 @@ Suporta múltiplos modelos: Gemini e OpenAI.
 import argparse
 import os
 import sys
+import logging
+from datetime import datetime
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
@@ -15,6 +17,14 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from dotenv import load_dotenv
 
+# Configura Logger global
+logging.basicConfig(
+    filename='execution.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    encoding='utf-8'
+)
+logger = logging.getLogger("main")
 # Carrega variáveis de ambiente primeiro
 load_dotenv()
 

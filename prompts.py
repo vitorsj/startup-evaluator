@@ -17,6 +17,7 @@ INSTRUÇÕES:
 - Extraia todas as informações disponíveis no documento
 - Para valores numéricos, mantenha o formato original (ex: "R$ 5M", "3x ao ano")
 - Se uma informação não estiver presente, deixe como null
+- Não invente informações. A fidelidade aos dados do documento é a prioridade máxima.
 - Identifique o estágio baseado nas métricas apresentadas:
   * Pre-Seed: Receita até R$ 1M, foco em validação
   * Seed: Receita R$ 3.5M-10M, primeiros sinais de PMF
@@ -45,7 +46,8 @@ EVALUATION_INSTRUCTIONS = """INSTRUÇÕES:
 4. Avalie cada dimensão: métricas, produto, tração, equipe, cap table
 5. Se informações críticas estiverem faltando, impacte negativamente a nota
 6. Seja rigoroso mas justo na avaliação
-7. Forneça justificativa detalhada explicando a nota"""
+7. Forneça justificativa detalhada explicando a nota
+8. Justifique a nota baseando-se EXCLUSIVAMENTE nas evidências extraídas."""
 
 
 def format_fund_criteria() -> str:

@@ -6,7 +6,11 @@ Suporta múltiplos modelos: Gemini e OpenAI.
 import os
 from pathlib import Path
 from dataclasses import dataclass
+from typing import Optional
+import logging
+
 from pydantic_ai import Agent, BinaryContent
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from config import NOTA_DESCRICOES
 from models import PitchDeckInfo, AvaliacaoStartup
@@ -17,6 +21,9 @@ from prompts import (
     get_evaluation_system_prompt,
     get_evaluation_user_prompt,
 )
+
+# Configuração de Logger
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -63,6 +70,18 @@ class StartupEvaluator:
         # Usa a string do modelo diretamente (Pydantic AI resolve automaticamente)
         model_string = self.model_config.model_string
         
+        # Configurações de geração
+        self.generation_settings = {
+            'temperature': self.model_config.temperature,
+            'top_p': self.model_config.top_p,
+        }
+        # Adiciona seed apenas se definido (OpenAI suporta, Gemini varia)
+        if self.model_config.seed is not None:
+             # Nota: Nem todos providers aceitam 'seed' em model_settings genérico, 
+             # mas OpenAI aceita. PydanticAI repassa kwargs extras frequentemente.
+             # Para garantir compatibilidade, vamos tentar passar.
+             self.generation_settings['seed'] = self.model_config.seed
+
         # Agente para extração de informações do pitch deck
         self.extraction_agent = Agent(
             model_string,
@@ -77,11 +96,32 @@ class StartupEvaluator:
             system_prompt=get_evaluation_system_prompt()
         )
         
+        logger.info(f"Evaluator inicializado: {model_name} | Settings: {self.generation_settings}")
+        
         # Tracking de uso
         self._total_input_tokens = 0
         self._total_output_tokens = 0
         self._total_requests = 0
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        reraise=True
+    )
+    def _run_agent_sync(self, agent: Agent, content):
+        """Executa agente com retry automático e configurações de modelo."""
+        try:
+            # Passa configurações de geração (temperature, top_p, etc)
+            # PydanticAI >= 0.0.49 suporta model_settings no run
+            return agent.run_sync(content, model_settings=self.generation_settings)
+        except TypeError:
+            # Fallback para versões antigas que não aceitam model_settings no run
+            logger.warning("Versão do PydanticAI não suporta model_settings em run_sync. Usando defaults.")
+            return agent.run_sync(content)
+        except Exception as e:
+            logger.warning(f"Erro na chamada do LLM (tentativa de retry): {e}")
+            raise e
+
     def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Calcula o custo estimado em USD."""
         pricing = self.model_config.pricing
@@ -126,24 +166,51 @@ class StartupEvaluator:
         Returns:
             PitchDeckInfo com informações extraídas
         """
+        logger.info(f"Iniciando extração de informações: {pdf_path}")
         pdf_bytes = Path(pdf_path).read_bytes()
         
         if self.model_config.supports_pdf:
             # Envia PDF diretamente (Gemini)
-            result = self.extraction_agent.run_sync([
+            content = [
                 EXTRACTION_USER_PROMPT,
                 BinaryContent(data=pdf_bytes, media_type='application/pdf')
-            ])
+            ]
+            result = self._run_agent_sync(self.extraction_agent, content)
         else:
             # Para OpenAI: converte PDF em imagens primeiro
+            logger.info("Convertendo PDF para imagens (modelo não suporta PDF nativo)...")
             images = self._pdf_to_images(pdf_path)
             content = [EXTRACTION_USER_PROMPT]
             for img_bytes in images:
                 content.append(BinaryContent(data=img_bytes, media_type='image/png'))
-            result = self.extraction_agent.run_sync(content)
+            result = self._run_agent_sync(self.extraction_agent, content)
         
         self._track_usage(result.usage())
+        
+        # Validação básica da extração
+        if not self._validate_extraction(result.output):
+            logger.warning(f"Extração de baixa qualidade para {pdf_path}")
+            # Não lançamos erro, mas logamos. Opcionalmente poderia marcar flag.
+            
         return result.output
+    
+    def _validate_extraction(self, info: PitchDeckInfo) -> bool:
+        """Verifica se a extração obteve informações mínimas."""
+        # Critérios mínimos: Nome da startup e pelo menos algum outro campo preenchido
+        has_name = info.nome_startup and info.nome_startup.lower() not in ["indefinido", "desconhecido", "null", "none"]
+        
+        # Conta campos preenchidos (ignorando None, "indefinido", etc)
+        filled_fields = 0
+        for field, value in info.model_dump().items():
+            if value and str(value).lower() not in ["indefinido", "desconhecido", "null", "none"]:
+                filled_fields += 1
+                
+        # Pelo menos nome e mais 2 campos relevantes
+        is_valid = has_name and filled_fields >= 3
+        if not is_valid:
+            logger.warning(f"Validação de extração falhou. Nome: {info.nome_startup}, Campos preenchidos: {filled_fields}")
+        
+        return is_valid
     
     def _pdf_to_images(self, pdf_path: str, max_pages: int = 10) -> list[bytes]:
         """
@@ -186,10 +253,11 @@ class StartupEvaluator:
         Returns:
             AvaliacaoStartup com nota e justificativa
         """
+        logger.info(f"Iniciando avaliação da startup: {pdf_info.nome_startup}")
         pdf_summary = self._format_pdf_info(pdf_info)
         prompt = get_evaluation_user_prompt(pdf_summary)
         
-        result = self.evaluation_agent.run_sync(prompt)
+        result = self._run_agent_sync(self.evaluation_agent, prompt)
         self._track_usage(result.usage())
         
         return result.output

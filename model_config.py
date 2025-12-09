@@ -27,6 +27,9 @@ class ModelConfig:
     pricing: ModelPricing
     supports_pdf: bool = True  # Se suporta envio de PDF direto
     description: str = ""
+    temperature: float = 0.0
+    top_p: float = 0.8
+    seed: int = 42 # Seed para reprodutibilidade (onde suportado)
 
 
 # Modelos disponíveis
