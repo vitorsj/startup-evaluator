@@ -8,3 +8,54 @@
 2025-12-09 11:04:13,700 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
 2025-12-09 11:04:13,824 - evaluator - INFO - Iniciando avaliação da startup: HARUMI
 2025-12-09 11:04:38,677 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 11:48:19,194 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v3 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 11:48:19,195 - evaluator - INFO - Iniciando extração de informações: ./Inputs/Pitch-deck-HARUMI-us-(3).pdf
+2025-12-09 11:48:48,120 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 11:48:48,270 - evaluator - INFO - Iniciando avaliação da startup: HARUMI
+2025-12-09 11:49:38,778 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 11:49:38,836 - evaluator - WARNING - Inconsistência detectada: Nota alta (4) mas apenas 1/3 critérios críticos atendidos. Revisar avaliação.
+2025-12-09 11:56:15,367 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v3 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 11:56:15,368 - evaluator - INFO - Iniciando extração de informações: ./Inputs/Pitchdeck_Altis.pdf
+2025-12-09 11:56:20,024 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 503 Service Unavailable"
+2025-12-09 11:56:20,054 - evaluator - WARNING - Erro na chamada do LLM (tentativa de retry): status_code: 503, model_name: gemini-2.5-flash, body: {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+2025-12-09 11:56:29,820 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 503 Service Unavailable"
+2025-12-09 11:56:29,846 - evaluator - WARNING - Erro na chamada do LLM (tentativa de retry): status_code: 503, model_name: gemini-2.5-flash, body: {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+2025-12-09 11:56:54,641 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 11:56:54,716 - evaluator - INFO - Iniciando avaliação da startup: ALTIS
+2025-12-09 11:58:09,058 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:01:35,061 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v3 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 12:01:35,061 - evaluator - INFO - Iniciando extração de informações: ./Inputs/PITCH DECK - GYMATCH V2 (2).pdf
+2025-12-09 12:01:53,921 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:01:54,024 - evaluator - INFO - Iniciando avaliação da startup: Gymatch
+2025-12-09 12:02:40,594 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:05:58,555 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v3 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 12:05:58,555 - evaluator - INFO - Iniciando extração de informações: ./Inputs/(PT-BR) SAAPO COIN â__ A RevoluÃ§Ã£o Digital no Descobrimento, AvaliaÃ§Ã£o e Financiamento de Talentos Esportivos Globais.pdf
+2025-12-09 12:06:23,978 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:06:24,048 - evaluator - INFO - Iniciando avaliação da startup: SAAPO COIN
+2025-12-09 12:07:11,462 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:11:12,627 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v2 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 12:11:12,627 - evaluator - INFO - Iniciando extração de informações: Inputs/(PT-BR) SAAPO COIN â__ A RevoluÃ§Ã£o Digital no Descobrimento, AvaliaÃ§Ã£o e Financiamento de Talentos Esportivos Globais.pdf
+2025-12-09 12:11:40,737 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:11:40,810 - evaluator - INFO - Iniciando avaliação da startup: SAAPO COIN
+2025-12-09 12:12:18,158 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:12:18,309 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v2 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 12:12:18,309 - evaluator - INFO - Iniciando extração de informações: Inputs/Pitch-deck-HARUMI-us-(3).pdf
+2025-12-09 12:12:47,143 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:12:47,261 - evaluator - INFO - Iniciando avaliação da startup: HARUMI
+2025-12-09 12:13:14,868 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:13:14,932 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v2 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 12:13:14,932 - evaluator - INFO - Iniciando extração de informações: Inputs/PITCH DECK - GYMATCH V2 (2).pdf
+2025-12-09 12:13:41,567 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:13:41,627 - evaluator - INFO - Iniciando avaliação da startup: Gymatch
+2025-12-09 12:14:07,322 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:14:07,373 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v2 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 12:14:07,373 - evaluator - INFO - Iniciando extração de informações: Inputs/Pitchdeck_Altis.pdf
+2025-12-09 12:14:28,936 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:14:28,969 - evaluator - INFO - Iniciando avaliação da startup: ALTIS
+2025-12-09 12:15:09,522 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:15:09,622 - evaluator - WARNING - Inconsistência detectada: Nota alta (4) mas apenas 0/3 critérios críticos atendidos. Revisar avaliação.
+2025-12-09 12:19:03,726 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v2 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 12:19:03,727 - evaluator - INFO - Iniciando extração de informações: ./Inputs/Pitch 5 Minutos Meu Mecanico_compressed.pdf
+2025-12-09 12:19:22,915 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 12:19:23,007 - evaluator - INFO - Iniciando avaliação da startup: Meu Mecânico
+2025-12-09 12:20:06,283 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
