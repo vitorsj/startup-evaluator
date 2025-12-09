@@ -3,3 +3,8 @@
 2025-12-09 10:45:00,481 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
 2025-12-09 10:45:00,595 - evaluator - INFO - Iniciando avaliação da startup: HARUMI
 2025-12-09 10:45:24,694 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 11:03:49,552 - evaluator - INFO - Evaluator inicializado: gemini-flash | Prompt: v2 | Settings: {'temperature': 0.0, 'top_p': 0.8, 'seed': 42}
+2025-12-09 11:03:49,552 - evaluator - INFO - Iniciando extração de informações: Inputs/Pitch-deck-HARUMI-us-(3).pdf
+2025-12-09 11:04:13,700 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-12-09 11:04:13,824 - evaluator - INFO - Iniciando avaliação da startup: HARUMI
+2025-12-09 11:04:38,677 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"

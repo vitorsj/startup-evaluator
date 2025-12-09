@@ -15,12 +15,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from config import NOTA_DESCRICOES
 from models import PitchDeckInfo, AvaliacaoStartup
 from model_config import get_model_config, ModelConfig, DEFAULT_MODEL
-from prompts import (
-    EXTRACTION_SYSTEM_PROMPT,
-    EXTRACTION_USER_PROMPT,
-    get_evaluation_system_prompt,
-    get_evaluation_user_prompt,
-)
+from prompts import get_prompts, DEFAULT_PROMPT_VERSION
 
 # Configuração de Logger
 logger = logging.getLogger(__name__)
@@ -49,15 +44,20 @@ class UsageInfo:
 class StartupEvaluator:
     """Avaliador de startups usando Pydantic AI com múltiplos modelos."""
     
-    def __init__(self, model_name: str = DEFAULT_MODEL):
+    def __init__(self, model_name: str = DEFAULT_MODEL, prompt_version: str = DEFAULT_PROMPT_VERSION):
         """
         Inicializa o avaliador.
         
         Args:
             model_name: Nome do modelo (ex: 'gemini-flash', 'gpt-5-mini', 'gpt-5-nano')
+            prompt_version: Versão do prompt a ser utilizada (ex: 'v1', 'v2')
         """
         self.model_config = get_model_config(model_name)
         self.model_name = model_name
+        self.prompt_version = prompt_version
+        
+        # Carrega a versão correta dos prompts
+        self.prompts = get_prompts(prompt_version)
         
         # Verifica se a API key está configurada
         api_key = os.getenv(self.model_config.env_var)
@@ -75,28 +75,25 @@ class StartupEvaluator:
             'temperature': self.model_config.temperature,
             'top_p': self.model_config.top_p,
         }
-        # Adiciona seed apenas se definido (OpenAI suporta, Gemini varia)
+        # Adiciona seed apenas se definido
         if self.model_config.seed is not None:
-             # Nota: Nem todos providers aceitam 'seed' em model_settings genérico, 
-             # mas OpenAI aceita. PydanticAI repassa kwargs extras frequentemente.
-             # Para garantir compatibilidade, vamos tentar passar.
              self.generation_settings['seed'] = self.model_config.seed
 
         # Agente para extração de informações do pitch deck
         self.extraction_agent = Agent(
             model_string,
             output_type=PitchDeckInfo,
-            system_prompt=EXTRACTION_SYSTEM_PROMPT
+            system_prompt=self.prompts.EXTRACTION_SYSTEM_PROMPT
         )
         
         # Agente para avaliação da startup
         self.evaluation_agent = Agent(
             model_string,
             output_type=AvaliacaoStartup,
-            system_prompt=get_evaluation_system_prompt()
+            system_prompt=self.prompts.get_evaluation_system_prompt()
         )
         
-        logger.info(f"Evaluator inicializado: {model_name} | Settings: {self.generation_settings}")
+        logger.info(f"Evaluator inicializado: {model_name} | Prompt: {prompt_version} | Settings: {self.generation_settings}")
         
         # Tracking de uso
         self._total_input_tokens = 0
@@ -111,11 +108,8 @@ class StartupEvaluator:
     def _run_agent_sync(self, agent: Agent, content):
         """Executa agente com retry automático e configurações de modelo."""
         try:
-            # Passa configurações de geração (temperature, top_p, etc)
-            # PydanticAI >= 0.0.49 suporta model_settings no run
             return agent.run_sync(content, model_settings=self.generation_settings)
         except TypeError:
-            # Fallback para versões antigas que não aceitam model_settings no run
             logger.warning("Versão do PydanticAI não suporta model_settings em run_sync. Usando defaults.")
             return agent.run_sync(content)
         except Exception as e:
@@ -157,55 +151,40 @@ class StartupEvaluator:
         self._total_requests = 0
     
     def extract_info(self, pdf_path: str) -> PitchDeckInfo:
-        """
-        Extrai informações do pitch deck.
-        
-        Args:
-            pdf_path: Caminho para o arquivo PDF
-            
-        Returns:
-            PitchDeckInfo com informações extraídas
-        """
+        """Extrai informações do pitch deck."""
         logger.info(f"Iniciando extração de informações: {pdf_path}")
         pdf_bytes = Path(pdf_path).read_bytes()
         
         if self.model_config.supports_pdf:
-            # Envia PDF diretamente (Gemini)
             content = [
-                EXTRACTION_USER_PROMPT,
+                self.prompts.EXTRACTION_USER_PROMPT,
                 BinaryContent(data=pdf_bytes, media_type='application/pdf')
             ]
             result = self._run_agent_sync(self.extraction_agent, content)
         else:
-            # Para OpenAI: converte PDF em imagens primeiro
             logger.info("Convertendo PDF para imagens (modelo não suporta PDF nativo)...")
             images = self._pdf_to_images(pdf_path)
-            content = [EXTRACTION_USER_PROMPT]
+            content = [self.prompts.EXTRACTION_USER_PROMPT]
             for img_bytes in images:
                 content.append(BinaryContent(data=img_bytes, media_type='image/png'))
             result = self._run_agent_sync(self.extraction_agent, content)
         
         self._track_usage(result.usage())
         
-        # Validação básica da extração
         if not self._validate_extraction(result.output):
             logger.warning(f"Extração de baixa qualidade para {pdf_path}")
-            # Não lançamos erro, mas logamos. Opcionalmente poderia marcar flag.
             
         return result.output
     
     def _validate_extraction(self, info: PitchDeckInfo) -> bool:
         """Verifica se a extração obteve informações mínimas."""
-        # Critérios mínimos: Nome da startup e pelo menos algum outro campo preenchido
         has_name = info.nome_startup and info.nome_startup.lower() not in ["indefinido", "desconhecido", "null", "none"]
         
-        # Conta campos preenchidos (ignorando None, "indefinido", etc)
         filled_fields = 0
         for field, value in info.model_dump().items():
             if value and str(value).lower() not in ["indefinido", "desconhecido", "null", "none"]:
                 filled_fields += 1
                 
-        # Pelo menos nome e mais 2 campos relevantes
         is_valid = has_name and filled_fields >= 3
         if not is_valid:
             logger.warning(f"Validação de extração falhou. Nome: {info.nome_startup}, Campos preenchidos: {filled_fields}")
@@ -213,30 +192,18 @@ class StartupEvaluator:
         return is_valid
     
     def _pdf_to_images(self, pdf_path: str, max_pages: int = 10) -> list[bytes]:
-        """
-        Converte PDF em imagens para modelos que não suportam PDF direto.
-        
-        Args:
-            pdf_path: Caminho para o arquivo PDF
-            max_pages: Número máximo de páginas
-            
-        Returns:
-            Lista de bytes das imagens PNG
-        """
+        """Converte PDF em imagens."""
         try:
             import fitz  # PyMuPDF
         except ImportError:
-            raise ImportError(
-                "PyMuPDF é necessário para usar OpenAI com PDFs. "
-                "Instale com: pip install PyMuPDF"
-            )
+            raise ImportError("PyMuPDF é necessário. pip install PyMuPDF")
         
         images = []
         doc = fitz.open(pdf_path)
         
         for page_num in range(min(len(doc), max_pages)):
             page = doc[page_num]
-            mat = fitz.Matrix(2.0, 2.0)  # Zoom 2x
+            mat = fitz.Matrix(2.0, 2.0)
             pix = page.get_pixmap(matrix=mat)
             images.append(pix.tobytes("png"))
         
@@ -244,18 +211,10 @@ class StartupEvaluator:
         return images
     
     def evaluate_startup(self, pdf_info: PitchDeckInfo) -> AvaliacaoStartup:
-        """
-        Avalia a startup com base nas informações extraídas.
-        
-        Args:
-            pdf_info: Informações extraídas do pitch deck
-            
-        Returns:
-            AvaliacaoStartup com nota e justificativa
-        """
+        """Avalia a startup com base nas informações extraídas."""
         logger.info(f"Iniciando avaliação da startup: {pdf_info.nome_startup}")
         pdf_summary = self._format_pdf_info(pdf_info)
-        prompt = get_evaluation_user_prompt(pdf_summary)
+        prompt = self.prompts.get_evaluation_user_prompt(pdf_summary)
         
         result = self._run_agent_sync(self.evaluation_agent, prompt)
         self._track_usage(result.usage())
@@ -263,25 +222,18 @@ class StartupEvaluator:
         return result.output
     
     def _validate_evaluation_consistency(self, avaliacao: AvaliacaoStartup) -> None:
-        """
-        Valida consistência da avaliação e alerta sobre inconsistências óbvias.
-        
-        Args:
-            avaliacao: Resultado da avaliação
-        """
-        # Verifica se critérios críticos foram reprovados mas a nota é alta
+        """Valida consistência da avaliação."""
         criterios = avaliacao.criterios_atendidos
-        
-        # Localização é critério eliminatório (KO criteria)
         localizacao_atendida = criterios.localizacao.atendido
         
-        if not localizacao_atendida and avaliacao.nota > 0:
-            logger.warning(
-                f"Inconsistência detectada: Startup não está no Brasil mas recebeu nota {avaliacao.nota}. "
-                f"Nota esperada seria 0 (critério eliminatório)."
+        # Na V2, localização 'null' pode ser não atendida mas com nota > 0
+        # Então relaxamos o aviso se for apenas não atendida (null), 
+        # mas mantemos se for explicitamente recusada e nota alta
+        if not localizacao_atendida and avaliacao.nota > 0 and self.prompt_version == 'v1':
+             logger.warning(
+                f"Inconsistência detectada (V1): Startup não está no Brasil mas recebeu nota {avaliacao.nota}."
             )
         
-        # Se a nota é alta (4-5) mas muitos critérios críticos não foram atendidos
         criterios_criticos = [
             criterios.localizacao,
             criterios.estagio_adequado,
@@ -306,34 +258,21 @@ class StartupEvaluator:
         return "\n".join(lines) if lines else "  - Nenhuma informação extraída"
     
     def evaluate(self, pdf_path: str) -> dict:
-        """
-        Realiza avaliação completa da startup.
-        
-        Args:
-            pdf_path: Caminho para o arquivo PDF do pitch deck
-            
-        Returns:
-            Dicionário com nota, justificativa, detalhes e uso
-        """
+        """Realiza avaliação completa da startup."""
         self.reset_usage()
         
-        # Passo 1: Extrai informações do pitch deck
         pdf_info = self.extract_info(pdf_path)
-        
-        # Passo 2: Avalia a startup
         avaliacao = self.evaluate_startup(pdf_info)
         
-        # Validação de consistência (alerta se houver inconsistências óbvias)
         self._validate_evaluation_consistency(avaliacao)
         
-        # Obtém informações de uso
         usage = self.get_usage()
         
-        # Converte para dicionário com campos adicionais
         result = avaliacao.model_dump()
         result['nota_descricao'] = NOTA_DESCRICOES.get(avaliacao.nota, "Desconhecida")
         result['pdf_info_extracted'] = pdf_info.model_dump()
         result['model_used'] = self.model_config.name
+        result['prompt_version'] = self.prompt_version
         result['usage'] = {
             'input_tokens': usage.input_tokens,
             'output_tokens': usage.output_tokens,

@@ -39,17 +39,19 @@ except ImportError:
 
 from evaluator import StartupEvaluator
 from model_config import AVAILABLE_MODELS, DEFAULT_MODEL, get_model_config, list_models
+from prompts import list_prompt_versions, DEFAULT_PROMPT_VERSION
 
 console = Console()
 
 
-def evaluate_single_startup(pdf_path: str, model_name: str = DEFAULT_MODEL) -> dict:
+def evaluate_single_startup(pdf_path: str, model_name: str = DEFAULT_MODEL, prompt_version: str = DEFAULT_PROMPT_VERSION) -> dict:
     """
     Avalia uma única startup.
     
     Args:
         pdf_path: Caminho para o PDF do pitch deck
         model_name: Nome do modelo a usar
+        prompt_version: Versão do prompt a usar
         
     Returns:
         Resultado da avaliação
@@ -64,13 +66,13 @@ def evaluate_single_startup(pdf_path: str, model_name: str = DEFAULT_MODEL) -> d
         
         task1 = progress.add_task(f"[cyan]Inicializando {model_config.name}...", total=None)
         try:
-            evaluator = StartupEvaluator(model_name=model_name)
+            evaluator = StartupEvaluator(model_name=model_name, prompt_version=prompt_version)
         except Exception as e:
             console.print(f"[red]Erro ao inicializar avaliador: {str(e)}[/red]")
             sys.exit(1)
         progress.update(task1, completed=True)
         
-        task2 = progress.add_task("[cyan]Analisando pitch deck e avaliando startup...", total=None)
+        task2 = progress.add_task(f"[cyan]Analisando pitch deck e avaliando startup (Prompt: {prompt_version})...", total=None)
         try:
             result = evaluator.evaluate(pdf_path)
         except Exception as e:
@@ -105,6 +107,7 @@ def display_result(result: dict, pdf_name: str):
     info_table = Table(show_header=False, box=None)
     info_table.add_row("[bold]Pitch Deck:[/bold]", pdf_name)
     info_table.add_row("[bold]Modelo:[/bold]", result.get('model_used', 'N/A'))
+    info_table.add_row("[bold]Prompt Version:[/bold]", result.get('prompt_version', 'N/A'))
     
     estagio = result.get('estagio_identificado', 'N/A')
     if hasattr(estagio, 'value'):
@@ -205,7 +208,7 @@ def display_result(result: dict, pdf_name: str):
         console.print(usage_table)
 
 
-def process_batch(pdf_folder: str, model_name: str = DEFAULT_MODEL):
+def process_batch(pdf_folder: str, model_name: str = DEFAULT_MODEL, prompt_version: str = DEFAULT_PROMPT_VERSION):
     """Processa multiplos pitch decks de uma pasta."""
     pdf_path = Path(pdf_folder)
     if not pdf_path.exists():
@@ -227,7 +230,7 @@ def process_batch(pdf_folder: str, model_name: str = DEFAULT_MODEL):
         
         console.print(f"\n[bold cyan]Processando: {pdf_name}[/bold cyan]")
         try:
-            result = evaluate_single_startup(str(pdf_file), model_name)
+            result = evaluate_single_startup(str(pdf_file), model_name, prompt_version)
             result['pdf_name'] = pdf_name
             results.append(result)
             total_cost += result.get('usage', {}).get('estimated_cost_usd', 0)
@@ -246,6 +249,7 @@ def process_batch(pdf_folder: str, model_name: str = DEFAULT_MODEL):
         summary_table.add_column("Estagio")
         summary_table.add_column("Startup")
         summary_table.add_column("Custo")
+        summary_table.add_column("Prompt")
         
         for r in sorted(results, key=lambda x: x.get('nota', 0), reverse=True):
             nota = r.get('nota', 0)
@@ -257,13 +261,15 @@ def process_batch(pdf_folder: str, model_name: str = DEFAULT_MODEL):
             
             nome = r.get('pdf_info_extracted', {}).get('nome_startup', 'N/A')
             custo = r.get('usage', {}).get('estimated_cost_usd', 0)
+            prompt_ver = r.get('prompt_version', 'N/A')
             
             summary_table.add_row(
                 r['pdf_name'],
                 f"[{nota_color}]{nota}/5[/{nota_color}]",
                 str(estagio).upper(),
                 nome or 'N/A',
-                f"${custo:.4f}"
+                f"${custo:.4f}",
+                prompt_ver
             )
         
         console.print(summary_table)
@@ -277,17 +283,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos:
-  # Avaliar com Gemini Flash (padrao)
+  # Avaliar com Gemini Flash (padrao) e Prompt V2 (padrao)
   python main.py --pdf pitch.pdf
+  
+  # Avaliar com Prompt V1 (lógica antiga)
+  python main.py --pdf pitch.pdf --prompt-version v1
   
   # Avaliar com GPT-5 Mini
   python main.py --pdf pitch.pdf --model gpt-5-mini
   
-  # Avaliar com GPT-5 Nano (mais economico)
-  python main.py --pdf pitch.pdf --model gpt-5-nano
-  
-  # Processar pasta de PDFs
-  python main.py --folder ./pitch_decks --model gemini-pro
+  # Processar pasta de PDFs com Prompt V2
+  python main.py --folder ./pitch_decks --prompt-version v2
   
   # Listar modelos disponiveis
   python main.py --list-models
@@ -302,6 +308,13 @@ Exemplos:
         default=DEFAULT_MODEL,
         choices=list(AVAILABLE_MODELS.keys()),
         help=f'Modelo a usar (padrao: {DEFAULT_MODEL})'
+    )
+    parser.add_argument(
+        '--prompt-version', '-p',
+        type=str,
+        default=DEFAULT_PROMPT_VERSION,
+        choices=list_prompt_versions(),
+        help=f'Versao do prompt (padrao: {DEFAULT_PROMPT_VERSION})'
     )
     parser.add_argument('--list-models', action='store_true', help='Lista modelos disponiveis')
     
@@ -323,13 +336,13 @@ Exemplos:
         console.print(f"\nExemplo: export {model_config.env_var}='sua-chave-aqui'")
         sys.exit(1)
     
-    console.print(f"[bold]Modelo: {model_config.name}[/bold]")
+    console.print(f"[bold]Modelo: {model_config.name} | Prompt: {args.prompt_version}[/bold]")
     if LOGFIRE_ENABLED:
         console.print("[dim]Logfire ativo - traces em https://logfire.pydantic.dev[/dim]")
     console.print()
     
     if args.folder:
-        process_batch(args.folder, args.model)
+        process_batch(args.folder, args.model, args.prompt_version)
         return
     
     if not args.pdf:
@@ -341,7 +354,7 @@ Exemplos:
         console.print(f"[red]PDF nao encontrado: {args.pdf}[/red]")
         sys.exit(1)
     
-    result = evaluate_single_startup(args.pdf, args.model)
+    result = evaluate_single_startup(args.pdf, args.model, args.prompt_version)
     display_result(result, Path(args.pdf).name)
 
 
