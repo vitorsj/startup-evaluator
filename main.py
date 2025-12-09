@@ -2,6 +2,7 @@
 """
 CLI principal para avaliação de startups.
 Recebe pitch deck (PDF) e retorna nota de 0-5 com justificativa.
+Suporta múltiplos modelos: Gemini e OpenAI.
 """
 
 import argparse
@@ -14,40 +15,51 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from dotenv import load_dotenv
 
-from evaluator import StartupEvaluator
-
-# Carrega variáveis de ambiente
+# Carrega variáveis de ambiente primeiro
 load_dotenv()
+
+# Configura Logfire para observabilidade (opcional)
+try:
+    import logfire
+    logfire.configure(send_to_logfire='if-token-present')
+    logfire.instrument_pydantic_ai()
+    LOGFIRE_ENABLED = True
+except ImportError:
+    LOGFIRE_ENABLED = False
+
+from evaluator import StartupEvaluator
+from model_config import AVAILABLE_MODELS, DEFAULT_MODEL, get_model_config, list_models
 
 console = Console()
 
 
-def evaluate_single_startup(pdf_path: str) -> dict:
+def evaluate_single_startup(pdf_path: str, model_name: str = DEFAULT_MODEL) -> dict:
     """
     Avalia uma única startup.
     
     Args:
         pdf_path: Caminho para o PDF do pitch deck
+        model_name: Nome do modelo a usar
         
     Returns:
         Resultado da avaliação
     """
+    model_config = get_model_config(model_name)
+    
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console
     ) as progress:
         
-        # Inicializa o avaliador
-        task1 = progress.add_task("[cyan]Inicializando Gemini AI...", total=None)
+        task1 = progress.add_task(f"[cyan]Inicializando {model_config.name}...", total=None)
         try:
-            evaluator = StartupEvaluator()
+            evaluator = StartupEvaluator(model_name=model_name)
         except Exception as e:
             console.print(f"[red]Erro ao inicializar avaliador: {str(e)}[/red]")
             sys.exit(1)
         progress.update(task1, completed=True)
         
-        # Avalia a startup (envia PDF diretamente)
         task2 = progress.add_task("[cyan]Analisando pitch deck e avaliando startup...", total=None)
         try:
             result = evaluator.evaluate(pdf_path)
@@ -60,17 +72,10 @@ def evaluate_single_startup(pdf_path: str) -> dict:
 
 
 def display_result(result: dict, pdf_name: str):
-    """
-    Exibe resultado formatado no terminal.
-    
-    Args:
-        result: Resultado da avaliação
-        pdf_name: Nome do arquivo PDF
-    """
+    """Exibe resultado formatado no terminal."""
     nota = result.get('nota', 0)
     nota_desc = result.get('nota_descricao', '')
     
-    # Cor baseada na nota
     if nota >= 4:
         nota_color = "green"
     elif nota >= 3:
@@ -80,28 +85,26 @@ def display_result(result: dict, pdf_name: str):
     else:
         nota_color = "red"
     
-    # Painel principal
     console.print("\n")
     console.print(Panel.fit(
         f"[bold {nota_color}]{nota}/5[/bold {nota_color}] - {nota_desc}",
-        title="[bold]Avaliação da Startup[/bold]",
+        title="[bold]Avaliacao da Startup[/bold]",
         border_style=nota_color
     ))
     
-    # Informações básicas
     info_table = Table(show_header=False, box=None)
     info_table.add_row("[bold]Pitch Deck:[/bold]", pdf_name)
+    info_table.add_row("[bold]Modelo:[/bold]", result.get('model_used', 'N/A'))
     
     estagio = result.get('estagio_identificado', 'N/A')
     if hasattr(estagio, 'value'):
         estagio = estagio.value
-    info_table.add_row("[bold]Estágio Identificado:[/bold]", str(estagio).upper())
+    info_table.add_row("[bold]Estagio Identificado:[/bold]", str(estagio).upper())
     console.print(info_table)
     
-    # Informações extraídas do pitch deck
     pdf_info = result.get('pdf_info_extracted', {})
     if pdf_info:
-        console.print("\n[bold]Informações Extraídas:[/bold]")
+        console.print("\n[bold]Informacoes Extraidas:[/bold]")
         extracted_table = Table(show_header=False, box=None, padding=(0, 2))
         
         nome = pdf_info.get('nome_startup')
@@ -110,7 +113,7 @@ def display_result(result: dict, pdf_name: str):
         
         localizacao = pdf_info.get('localizacao')
         if localizacao:
-            extracted_table.add_row("[dim]Localização:[/dim]", localizacao)
+            extracted_table.add_row("[dim]Localizacao:[/dim]", localizacao)
         
         receita = pdf_info.get('receita_anual')
         if receita:
@@ -126,49 +129,55 @@ def display_result(result: dict, pdf_name: str):
         
         console.print(extracted_table)
     
-    # Justificativa
     console.print("\n[bold]Justificativa:[/bold]")
-    console.print(Panel(result.get('justificativa', 'Não disponível'), border_style="blue"))
+    console.print(Panel(result.get('justificativa', 'Nao disponivel'), border_style="blue"))
     
-    # Pontos positivos
     pontos_pos = result.get('pontos_positivos', [])
     if pontos_pos:
-        console.print("\n[bold green]✓ Pontos Positivos:[/bold green]")
+        console.print("\n[bold green]Pontos Positivos:[/bold green]")
         for ponto in pontos_pos:
-            console.print(f"  • {ponto}")
+            console.print(f"  - {ponto}")
     
-    # Pontos negativos
     pontos_neg = result.get('pontos_negativos', [])
     if pontos_neg:
-        console.print("\n[bold red]✗ Pontos Negativos:[/bold red]")
+        console.print("\n[bold red]Pontos Negativos:[/bold red]")
         for ponto in pontos_neg:
-            console.print(f"  • {ponto}")
+            console.print(f"  - {ponto}")
     
-    # Critérios atendidos
     criterios = result.get('criterios_atendidos', {})
     if criterios:
-        console.print("\n[bold]Critérios Atendidos:[/bold]")
+        console.print("\n[bold]Criterios Atendidos:[/bold]")
         criterios_table = Table(show_header=True, header_style="bold")
-        criterios_table.add_column("Critério")
+        criterios_table.add_column("Criterio")
         criterios_table.add_column("Status")
         
         for criterio, atendido in criterios.items():
-            status = "[green]✓ Sim[/green]" if atendido else "[red]✗ Não[/red]"
+            status = "[green]Sim[/green]" if atendido else "[red]Nao[/red]"
             criterios_table.add_row(criterio.replace('_', ' ').title(), status)
         
         console.print(criterios_table)
-
-
-def process_batch(pdf_folder: str):
-    """
-    Processa múltiplos pitch decks de uma pasta.
     
-    Args:
-        pdf_folder: Pasta contendo PDFs
-    """
+    usage = result.get('usage', {})
+    if usage:
+        console.print("\n[bold dim]Uso da API:[/bold dim]")
+        usage_table = Table(show_header=False, box=None, padding=(0, 2))
+        usage_table.add_row(
+            "[dim]Tokens:[/dim]", 
+            f"{usage.get('total_tokens', 0):,} (input: {usage.get('input_tokens', 0):,}, output: {usage.get('output_tokens', 0):,})"
+        )
+        usage_table.add_row("[dim]Requests:[/dim]", str(usage.get('requests', 0)))
+        usage_table.add_row(
+            "[dim]Custo estimado:[/dim]", 
+            f"[cyan]${usage.get('estimated_cost_usd', 0):.4f} USD[/cyan]"
+        )
+        console.print(usage_table)
+
+
+def process_batch(pdf_folder: str, model_name: str = DEFAULT_MODEL):
+    """Processa multiplos pitch decks de uma pasta."""
     pdf_path = Path(pdf_folder)
     if not pdf_path.exists():
-        console.print(f"[red]Pasta não encontrada: {pdf_folder}[/red]")
+        console.print(f"[red]Pasta nao encontrada: {pdf_folder}[/red]")
         sys.exit(1)
     
     pdf_files = list(pdf_path.glob("*.pdf"))
@@ -179,29 +188,32 @@ def process_batch(pdf_folder: str):
     console.print(f"[bold]Encontrados {len(pdf_files)} PDFs[/bold]\n")
     
     results = []
+    total_cost = 0.0
+    
     for pdf_file in pdf_files:
         pdf_name = pdf_file.name
         
         console.print(f"\n[bold cyan]Processando: {pdf_name}[/bold cyan]")
         try:
-            result = evaluate_single_startup(str(pdf_file))
+            result = evaluate_single_startup(str(pdf_file), model_name)
             result['pdf_name'] = pdf_name
             results.append(result)
+            total_cost += result.get('usage', {}).get('estimated_cost_usd', 0)
             display_result(result, pdf_name)
         except Exception as e:
             console.print(f"[red]Erro ao processar {pdf_name}: {str(e)}[/red]")
     
-    # Resumo final
     if results:
-        console.print("\n[bold]═══════════════════════════════════════════[/bold]")
-        console.print("[bold]               RESUMO FINAL                [/bold]")
-        console.print("[bold]═══════════════════════════════════════════[/bold]\n")
+        console.print("\n" + "=" * 50)
+        console.print("[bold]RESUMO FINAL[/bold]")
+        console.print("=" * 50 + "\n")
         
         summary_table = Table(show_header=True, header_style="bold")
         summary_table.add_column("PDF")
         summary_table.add_column("Nota")
-        summary_table.add_column("Estágio")
+        summary_table.add_column("Estagio")
         summary_table.add_column("Startup")
+        summary_table.add_column("Custo")
         
         for r in sorted(results, key=lambda x: x.get('nota', 0), reverse=True):
             nota = r.get('nota', 0)
@@ -212,69 +224,92 @@ def process_batch(pdf_folder: str):
                 estagio = estagio.value
             
             nome = r.get('pdf_info_extracted', {}).get('nome_startup', 'N/A')
+            custo = r.get('usage', {}).get('estimated_cost_usd', 0)
             
             summary_table.add_row(
                 r['pdf_name'],
                 f"[{nota_color}]{nota}/5[/{nota_color}]",
                 str(estagio).upper(),
-                nome or 'N/A'
+                nome or 'N/A',
+                f"${custo:.4f}"
             )
         
         console.print(summary_table)
+        console.print(f"\n[bold]Custo total estimado: [cyan]${total_cost:.4f} USD[/cyan][/bold]")
 
 
 def main():
-    """Função principal do CLI."""
+    """Funcao principal do CLI."""
     parser = argparse.ArgumentParser(
-        description="Avaliador de Startups para VC - Analisa pitch decks com Gemini AI",
+        description="Avaliador de Startups para VC - Analisa pitch decks com IA",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos:
-  # Avaliar um pitch deck
+  # Avaliar com Gemini Flash (padrao)
   python main.py --pdf pitch.pdf
   
+  # Avaliar com GPT-5 Mini
+  python main.py --pdf pitch.pdf --model gpt-5-mini
+  
+  # Avaliar com GPT-5 Nano (mais economico)
+  python main.py --pdf pitch.pdf --model gpt-5-nano
+  
   # Processar pasta de PDFs
-  python main.py --folder ./pitch_decks
+  python main.py --folder ./pitch_decks --model gemini-pro
+  
+  # Listar modelos disponiveis
+  python main.py --list-models
         """
     )
     
+    parser.add_argument('--pdf', type=str, help='Caminho para o PDF do pitch deck')
+    parser.add_argument('--folder', type=str, help='Pasta contendo multiplos PDFs')
     parser.add_argument(
-        '--pdf',
+        '--model', '-m',
         type=str,
-        help='Caminho para o PDF do pitch deck'
+        default=DEFAULT_MODEL,
+        choices=list(AVAILABLE_MODELS.keys()),
+        help=f'Modelo a usar (padrao: {DEFAULT_MODEL})'
     )
-    
-    parser.add_argument(
-        '--folder',
-        type=str,
-        help='Pasta contendo múltiplos PDFs para processar em lote'
-    )
+    parser.add_argument('--list-models', action='store_true', help='Lista modelos disponiveis')
     
     args = parser.parse_args()
     
-    # Verifica API key
-    if not os.getenv('GEMINI_API_KEY'):
-        console.print("[red]Erro: GEMINI_API_KEY não configurada![/red]")
-        console.print("Configure a variável de ambiente ou crie um arquivo .env")
-        console.print("\nExemplo: export GEMINI_API_KEY='sua-chave-aqui'")
-        sys.exit(1)
-    
-    # Modo batch
-    if args.folder:
-        process_batch(args.folder)
+    if args.list_models:
+        console.print(list_models())
         return
     
-    # Modo single
+    try:
+        model_config = get_model_config(args.model)
+    except ValueError as e:
+        console.print(f"[red]Erro: {e}[/red]")
+        sys.exit(1)
+    
+    if not os.getenv(model_config.env_var):
+        console.print(f"[red]Erro: {model_config.env_var} nao configurada![/red]")
+        console.print(f"Configure a variavel de ambiente para usar {model_config.name}")
+        console.print(f"\nExemplo: export {model_config.env_var}='sua-chave-aqui'")
+        sys.exit(1)
+    
+    console.print(f"[bold]Modelo: {model_config.name}[/bold]")
+    if LOGFIRE_ENABLED:
+        console.print("[dim]Logfire ativo - traces em https://logfire.pydantic.dev[/dim]")
+    console.print()
+    
+    if args.folder:
+        process_batch(args.folder, args.model)
+        return
+    
     if not args.pdf:
         parser.print_help()
-        console.print("\n[red]Erro: --pdf é obrigatório no modo single[/red]")
+        console.print("\n[red]Erro: --pdf e obrigatorio no modo single[/red]")
         sys.exit(1)
     
     if not Path(args.pdf).exists():
-        console.print(f"[red]PDF não encontrado: {args.pdf}[/red]")
+        console.print(f"[red]PDF nao encontrado: {args.pdf}[/red]")
         sys.exit(1)
     
-    result = evaluate_single_startup(args.pdf)
+    result = evaluate_single_startup(args.pdf, args.model)
     display_result(result, Path(args.pdf).name)
 
 
