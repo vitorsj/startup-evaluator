@@ -80,19 +80,33 @@ class PromptV1(BasePrompt):
     Se localização não for Brasil (ou null), elimina.
     """
     EXTRACTION_SYSTEM_PROMPT = """Você é um especialista em análise de pitch decks de startups.
-Sua tarefa é extrair informações relevantes do pitch deck em PDF.
+Sua tarefa é extrair informações estruturadas para due diligence de investimento.
 
-INSTRUÇÕES:
-- Extraia todas as informações disponíveis no documento
-- Para valores numéricos, mantenha o formato original (ex: "R$ 5M", "3x ao ano")
-- IMPORTANTE: Extraia valores numéricos exatos quando disponíveis. Se encontrar "R$ 5 milhões", extraia como "R$ 5M" ou "5000000" para facilitar comparações matemáticas posteriores.
-- Se uma informação não estiver presente, deixe como null
-- Não invente informações. A fidelidade aos dados do documento é a prioridade máxima.
-- Identifique o estágio baseado nas métricas apresentadas:
-  * Pre-Seed: Receita até R$ 1M, foco em validação
-  * Seed: Receita R$ 3.5M-10M, primeiros sinais de PMF
-  * Series A: Receita R$ 18M-30M, máquina de vendas pronta
-- Seja detalhado e preciso na extração"""
+DIRETRIZES DE EXTRAÇÃO:
+
+1. FIDELIDADE E PRECISÃO
+- Baseie-se APENAS no documento fornecido. Se não encontrar, retorne `null` (JSON).
+- Não alucine valores.
+
+2. VALORES NUMÉRICOS E MOEDAS
+- Padronize valores monetários para: "Moeda Valor (Valor Puro)".
+  * Exemplo: "R$ 5M (5000000)", "US$ 150k (150000 USD)".
+- Se a moeda não for explícita, verifique o contexto (ex: "R$" vs "$", endereço da empresa).
+
+3. HEURÍSTICAS DE BUSCA (Quando não explícito)
+- **Equipe**: Busque logotipos de empresas anteriores ao lado das fotos dos fundadores.
+
+4. CLASSIFICAÇÃO DE ESTÁGIO (Critério Rígido)
+- Classifique baseado na Receita Anual (ARR) ou Rodada Buscada (priorize ARR):
+  * **Pre-Seed**: Receita < R$ 1M/ano. Rodada < R$ 5M. (Foco: Validação)
+  * **Seed**: Receita R$ 1M - 10M/ano. Rodada R$ 5M - 20M. (Foco: PMF/Tração inicial)
+  * **Series A**: Receita > R$ 15M/ano. Rodada > R$ 20M. (Foco: Escala)
+- Se houver conflito (ex: receita de Seed mas pede rodada de Series A), priorize a métrica de Receita.
+
+5. CAMPOS ESPECÍFICOS
+- `tracao_metricas`: Liste KPIs chave (CAC, LTV, Churn, DAU/MAU) com datas.
+- `cap_table`: Procure termos como "post-money", "pre-money", "pool", "esop".
+"""
 
     EXTRACTION_USER_PROMPT = "Analise este pitch deck e extraia todas as informações relevantes:"
 
@@ -120,6 +134,9 @@ PASSO 2 - AVALIAÇÃO DE CRITÉRIOS:
   * Cite a evidência específica encontrada nos dados extraídos (evidencia_encontrada)
   * Exemplo: "Localização: atendido=true, evidencia_encontrada='Localização: São Paulo, Brasil'"
 - Seja rigoroso: se a evidência não estiver clara nos dados, marque como não atendido
+- Preencha os campos de saída exigidos: 
+  * pontos_positivos: lista com 3-5 bullets curtos e objetivos
+  * pontos_negativos: lista com 3-5 bullets curtos; inclua "informação faltante sobre X" quando aplicável
 
 PASSO 3 - ATRIBUIÇÃO DA NOTA:
 1. Verifique se a startup está localizada no Brasil (critério eliminatório)
@@ -134,7 +151,8 @@ PASSO 3 - ATRIBUIÇÃO DA NOTA:
 IMPORTANTE:
 - NUNCA invente dados que não foram extraídos
 - SEMPRE cite a fonte (dados extraídos) ao avaliar cada critério
-- Se um valor numérico não estiver na faixa esperada, documente isso claramente na evidência"""
+- Se um valor numérico não estiver na faixa esperada, documente isso claramente na evidência
+- IDIOMA: Responda ESTRITAMENTE em Português do Brasil. Mantenha termos técnicos de VC em inglês (ex: Valuation, Churn, Cap Table)."""
 
     @staticmethod
     def get_evaluation_system_prompt() -> str:
@@ -198,6 +216,9 @@ PASSO 2 - AVALIAÇÃO DE CRITÉRIOS:
   * Determine se foi atendido (atendido: true/false)
   * Cite a evidência específica encontrada nos dados extraídos (evidencia_encontrada)
   * IMPORTANTE SOBRE LOCALIZAÇÃO: Se a localização for 'null' (não informada), considere como "Não Atendido" mas NÃO ELIMINE a startup apenas por isso. Marque a evidência como "Localização não informada no deck".
+- Preencha os campos de saída exigidos:
+  * pontos_positivos: 3-5 bullets objetivos baseados no deck
+  * pontos_negativos: 3-5 bullets objetivos; inclua faltas de dados e penalidades
 
 PASSO 3 - ATRIBUIÇÃO DA NOTA:
 1. Verificação de Localização (Critério Eliminatório):
@@ -215,7 +236,8 @@ PASSO 3 - ATRIBUIÇÃO DA NOTA:
 IMPORTANTE:
 - NUNCA invente dados que não foram extraídos
 - SEMPRE cite a fonte (dados extraídos) ao avaliar cada critério
-- Se um valor numérico não estiver na faixa esperada, documente isso claramente na evidência"""
+- Se um valor numérico não estiver na faixa esperada, documente isso claramente na evidência
+- IDIOMA: Responda ESTRITAMENTE em Português do Brasil. Mantenha termos técnicos de VC em inglês (ex: Valuation, Churn, Cap Table)."""
 
     @staticmethod
     def get_evaluation_system_prompt() -> str:
@@ -396,12 +418,15 @@ PASSO 1 - ANÁLISE PRELIMINAR (Chain of Thought Cético):
   4. Atribua a pontuação exata.
 - Documente: "Critério X: [evidência ou 'não informado'] -> Pontos: Y"
 - Aplique penalidades (modificadores) se houver riscos ou falta de dados críticos.
-- Calcule a SOMA TOTAL.
+- OBRIGATÓRIO: Escreva a equação da soma explicitamente: "Cálculo: P1 + P2 + ... - Penalidades = TOTAL". Verifique a aritmética.
 
 PASSO 2 - AVALIAÇÃO DE CRITÉRIOS:
 - Para cada critério (localização, estágio, métricas, produto, equipe):
   * Determine se foi atendido.
   * Cite a evidência. Se não houver evidência, escreva "NÃO INFORMADO NO DECK".
+- Preencha os campos de saída exigidos:
+  * pontos_positivos: 3-5 bullets objetivos baseados no deck
+  * pontos_negativos: 3-5 bullets objetivos; inclua faltas de dados e penalidades
 
 PASSO 3 - MAPEAMENTO DA PONTUAÇÃO PARA NOTA 0-5:
 1. Use a pontuação total do PASSO 1.
@@ -420,7 +445,7 @@ PASSO 4 - JUSTIFICATIVA:
 
 IMPORTANTE:
 - PROIBIDO INFERIR DADOS. Se não está escrito, não existe.
-- MELHOR PECAR PELO EXCESSO DE RIGOR DO QUE PELO OTIMISMO.
+- IDIOMA: Responda ESTRITAMENTE em Português do Brasil. Mantenha termos técnicos de VC em inglês (ex: Valuation, Churn, Cap Table).
 """
 
     @staticmethod
@@ -448,7 +473,7 @@ IMPORTANTE: Siga a ordem das instruções:
 3. Calcule a pontuação total e mapeie para a nota final (0-5) conforme a escala
 4. Por fim, forneça justificativa detalhada explicando a pontuação e destacando pontos fortes e fracos
 
-Quando o material fornecido não for suficiente, busque informações na Internet ou indique claramente quais informações faltam.
+Quando o material fornecido não for suficiente, indique claramente quais informações faltam e penalize conforme a regra de ausência. Não utilize fontes externas.
 
 Forneça uma avaliação completa com nota de 0-5 e justificativa detalhada."""
 
