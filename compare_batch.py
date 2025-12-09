@@ -32,8 +32,16 @@ def run_comparison(pdf_folder="Inputs"):
 
     # Initialize evaluators
     try:
-        evaluator_v2 = StartupEvaluator(model_name=DEFAULT_MODEL, prompt_version="v2")
-        evaluator_astella = StartupEvaluator(model_name=DEFAULT_MODEL, prompt_version="astella")
+        evaluator_v2 = StartupEvaluator(
+            extraction_model=DEFAULT_MODEL, 
+            evaluation_model=DEFAULT_MODEL, 
+            prompt_version="v2"
+        )
+        evaluator_astella = StartupEvaluator(
+            extraction_model=DEFAULT_MODEL, 
+            evaluation_model=DEFAULT_MODEL, 
+            prompt_version="astella"
+        )
     except Exception as e:
         console.print(f"[red]Erro ao inicializar avaliadores: {str(e)}[/red]")
         return

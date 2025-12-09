@@ -56,7 +56,7 @@ AVAILABLE_MODELS: dict[str, ModelConfig] = {
     "gemini-3": ModelConfig(
         name="Gemini 3 Pro",
         provider="gemini",
-        model_string="google-gla:gemini-3-pro",
+        model_string="google-gla:gemini-3-pro-preview",
         env_var="GEMINI_API_KEY",
         pricing=ModelPricing(input_per_million=2.00, output_per_million=12.00),
         supports_pdf=True,

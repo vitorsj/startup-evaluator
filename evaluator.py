@@ -8,6 +8,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
 import logging
+import logfire
 
 from pydantic_ai import Agent, BinaryContent
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -19,16 +20,17 @@ from prompts import get_prompts, DEFAULT_PROMPT_VERSION
 
 # Configuração de Logger
 logger = logging.getLogger(__name__)
+logfire.configure(send_to_logfire='if-token-present')
+logfire.instrument_pydantic_ai()
 
 
 @dataclass
 class UsageInfo:
-    """Informações de uso e custo da API."""
+    """Informações de uso da API."""
     input_tokens: int
     output_tokens: int
     total_tokens: int
     requests: int
-    estimated_cost_usd: float
     model_name: str
     
     def __str__(self) -> str:
@@ -36,64 +38,81 @@ class UsageInfo:
             f"Modelo: {self.model_name} | "
             f"Tokens: {self.total_tokens:,} "
             f"(input: {self.input_tokens:,}, output: {self.output_tokens:,}) | "
-            f"Requests: {self.requests} | "
-            f"Custo estimado: ${self.estimated_cost_usd:.4f}"
+            f"Requests: {self.requests}"
         )
 
 
 class StartupEvaluator:
     """Avaliador de startups usando Pydantic AI com múltiplos modelos."""
     
-    def __init__(self, model_name: str = DEFAULT_MODEL, prompt_version: str = DEFAULT_PROMPT_VERSION):
+    def __init__(
+        self, 
+        extraction_model: str = DEFAULT_MODEL, 
+        evaluation_model: str = DEFAULT_MODEL, 
+        prompt_version: str = DEFAULT_PROMPT_VERSION
+    ):
         """
-        Inicializa o avaliador.
+        Inicializa o avaliador com modelos separados para extração e avaliação.
         
         Args:
-            model_name: Nome do modelo (ex: 'gemini-flash', 'gpt-5-mini', 'gpt-5-nano')
-            prompt_version: Versão do prompt a ser utilizada (ex: 'v1', 'v2')
+            extraction_model: Modelo para extração do PDF (ex: 'gemini-flash')
+            evaluation_model: Modelo para avaliação da startup (ex: 'gemini-pro')
+            prompt_version: Versão do prompt a ser utilizada (ex: 'v1', 'v2', 'astella')
         """
-        self.model_config = get_model_config(model_name)
-        self.model_name = model_name
+        self.extraction_config = get_model_config(extraction_model)
+        self.evaluation_config = get_model_config(evaluation_model)
+        self.extraction_model_name = extraction_model
+        self.evaluation_model_name = evaluation_model
         self.prompt_version = prompt_version
         
         # Carrega a versão correta dos prompts
         self.prompts = get_prompts(prompt_version)
         
-        # Verifica se a API key está configurada
-        api_key = os.getenv(self.model_config.env_var)
-        if not api_key:
-            raise ValueError(
-                f"{self.model_config.env_var} não encontrada. "
-                f"Configure a variável de ambiente para usar {self.model_config.name}."
-            )
+        # Verifica se as API keys estão configuradas
+        for config in [self.extraction_config, self.evaluation_config]:
+            api_key = os.getenv(config.env_var)
+            if not api_key:
+                raise ValueError(
+                    f"{config.env_var} não encontrada. "
+                    f"Configure a variável de ambiente para usar {config.name}."
+                )
         
-        # Usa a string do modelo diretamente (Pydantic AI resolve automaticamente)
-        model_string = self.model_config.model_string
-        
-        # Configurações de geração
-        self.generation_settings = {
-            'temperature': self.model_config.temperature,
-            'top_p': self.model_config.top_p,
+        # Configurações de geração para extração
+        self.extraction_settings = {
+            'temperature': self.extraction_config.temperature,
+            'top_p': self.extraction_config.top_p,
         }
-        # Adiciona seed apenas se definido
-        if self.model_config.seed is not None:
-             self.generation_settings['seed'] = self.model_config.seed
+        if self.extraction_config.seed is not None:
+            self.extraction_settings['seed'] = self.extraction_config.seed
+        
+        # Configurações de geração para avaliação
+        self.evaluation_settings = {
+            'temperature': self.evaluation_config.temperature,
+            'top_p': self.evaluation_config.top_p,
+        }
+        if self.evaluation_config.seed is not None:
+            self.evaluation_settings['seed'] = self.evaluation_config.seed
 
         # Agente para extração de informações do pitch deck
         self.extraction_agent = Agent(
-            model_string,
+            self.extraction_config.model_string,
             output_type=PitchDeckInfo,
             system_prompt=self.prompts.EXTRACTION_SYSTEM_PROMPT
         )
         
         # Agente para avaliação da startup
         self.evaluation_agent = Agent(
-            model_string,
+            self.evaluation_config.model_string,
             output_type=AvaliacaoStartup,
             system_prompt=self.prompts.get_evaluation_system_prompt()
         )
         
-        logger.info(f"Evaluator inicializado: {model_name} | Prompt: {prompt_version} | Settings: {self.generation_settings}")
+        logger.info(
+            f"Evaluator inicializado | "
+            f"Extração: {extraction_model} | "
+            f"Avaliação: {evaluation_model} | "
+            f"Prompt: {prompt_version}"
+        )
         
         # Tracking de uso
         self._total_input_tokens = 0
@@ -105,10 +124,10 @@ class StartupEvaluator:
         wait=wait_exponential(multiplier=1, min=4, max=10),
         reraise=True
     )
-    def _run_agent_sync(self, agent: Agent, content):
+    def _run_agent_sync(self, agent: Agent, content, model_settings: dict):
         """Executa agente com retry automático e configurações de modelo."""
         try:
-            return agent.run_sync(content, model_settings=self.generation_settings)
+            return agent.run_sync(content, model_settings=model_settings)
         except TypeError:
             logger.warning("Versão do PydanticAI não suporta model_settings em run_sync. Usando defaults.")
             return agent.run_sync(content)
@@ -116,13 +135,6 @@ class StartupEvaluator:
             logger.warning(f"Erro na chamada do LLM (tentativa de retry): {e}")
             raise e
 
-    def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
-        """Calcula o custo estimado em USD."""
-        pricing = self.model_config.pricing
-        input_cost = (input_tokens / 1_000_000) * pricing.input_per_million
-        output_cost = (output_tokens / 1_000_000) * pricing.output_per_million
-        return input_cost + output_cost
-    
     def _track_usage(self, usage) -> None:
         """Acumula uso de tokens."""
         if usage:
@@ -137,11 +149,7 @@ class StartupEvaluator:
             output_tokens=self._total_output_tokens,
             total_tokens=self._total_input_tokens + self._total_output_tokens,
             requests=self._total_requests,
-            estimated_cost_usd=self._calculate_cost(
-                self._total_input_tokens, 
-                self._total_output_tokens
-            ),
-            model_name=self.model_config.name
+            model_name=f"{self.extraction_config.name} / {self.evaluation_config.name}"
         )
     
     def reset_usage(self) -> None:
@@ -152,22 +160,22 @@ class StartupEvaluator:
     
     def extract_info(self, pdf_path: str) -> PitchDeckInfo:
         """Extrai informações do pitch deck."""
-        logger.info(f"Iniciando extração de informações: {pdf_path}")
+        logger.info(f"Iniciando extração de informações: {pdf_path} (modelo: {self.extraction_config.name})")
         pdf_bytes = Path(pdf_path).read_bytes()
         
-        if self.model_config.supports_pdf:
+        if self.extraction_config.supports_pdf:
             content = [
                 self.prompts.EXTRACTION_USER_PROMPT,
                 BinaryContent(data=pdf_bytes, media_type='application/pdf')
             ]
-            result = self._run_agent_sync(self.extraction_agent, content)
+            result = self._run_agent_sync(self.extraction_agent, content, self.extraction_settings)
         else:
             logger.info("Convertendo PDF para imagens (modelo não suporta PDF nativo)...")
             images = self._pdf_to_images(pdf_path)
             content = [self.prompts.EXTRACTION_USER_PROMPT]
             for img_bytes in images:
                 content.append(BinaryContent(data=img_bytes, media_type='image/png'))
-            result = self._run_agent_sync(self.extraction_agent, content)
+            result = self._run_agent_sync(self.extraction_agent, content, self.extraction_settings)
         
         self._track_usage(result.usage())
         
@@ -212,11 +220,11 @@ class StartupEvaluator:
     
     def evaluate_startup(self, pdf_info: PitchDeckInfo) -> AvaliacaoStartup:
         """Avalia a startup com base nas informações extraídas."""
-        logger.info(f"Iniciando avaliação da startup: {pdf_info.nome_startup}")
+        logger.info(f"Iniciando avaliação da startup: {pdf_info.nome_startup} (modelo: {self.evaluation_config.name})")
         pdf_summary = self._format_pdf_info(pdf_info)
         prompt = self.prompts.get_evaluation_user_prompt(pdf_summary)
         
-        result = self._run_agent_sync(self.evaluation_agent, prompt)
+        result = self._run_agent_sync(self.evaluation_agent, prompt, self.evaluation_settings)
         self._track_usage(result.usage())
         
         return result.output
@@ -271,14 +279,14 @@ class StartupEvaluator:
         result = avaliacao.model_dump()
         result['nota_descricao'] = NOTA_DESCRICOES.get(avaliacao.nota, "Desconhecida")
         result['pdf_info_extracted'] = pdf_info.model_dump()
-        result['model_used'] = self.model_config.name
+        result['extraction_model'] = self.extraction_config.name
+        result['evaluation_model'] = self.evaluation_config.name
         result['prompt_version'] = self.prompt_version
         result['usage'] = {
             'input_tokens': usage.input_tokens,
             'output_tokens': usage.output_tokens,
             'total_tokens': usage.total_tokens,
             'requests': usage.requests,
-            'estimated_cost_usd': usage.estimated_cost_usd,
         }
         
         return result
