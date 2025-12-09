@@ -139,6 +139,11 @@ def display_result(result: dict, pdf_name: str):
         
         console.print(extracted_table)
     
+    analise_preliminar = result.get('analise_preliminar')
+    if analise_preliminar:
+        console.print("\n[bold cyan]Análise Preliminar (Chain of Thought):[/bold cyan]")
+        console.print(Panel(analise_preliminar, border_style="cyan"))
+    
     console.print("\n[bold]Justificativa:[/bold]")
     console.print(Panel(result.get('justificativa', 'Nao disponivel'), border_style="blue"))
     
@@ -160,10 +165,27 @@ def display_result(result: dict, pdf_name: str):
         criterios_table = Table(show_header=True, header_style="bold")
         criterios_table.add_column("Criterio")
         criterios_table.add_column("Status")
+        criterios_table.add_column("Evidencia")
         
-        for criterio, atendido in criterios.items():
+        for criterio, criterio_data in criterios.items():
+            # Suporta tanto a nova estrutura (dict com 'atendido' e 'evidencia_encontrada')
+            # quanto a antiga (bool direto) para compatibilidade
+            if isinstance(criterio_data, dict):
+                atendido = criterio_data.get('atendido', False)
+                evidencia = criterio_data.get('evidencia_encontrada', 'N/A')
+            else:
+                # Fallback para estrutura antiga (bool)
+                atendido = criterio_data
+                evidencia = 'N/A'
+            
             status = "[green]Sim[/green]" if atendido else "[red]Nao[/red]"
-            criterios_table.add_row(criterio.replace('_', ' ').title(), status)
+            # Limita o tamanho da evidência para não quebrar a tabela
+            evidencia_display = evidencia[:80] + "..." if len(evidencia) > 80 else evidencia
+            criterios_table.add_row(
+                criterio.replace('_', ' ').title(), 
+                status,
+                f"[dim]{evidencia_display}[/dim]"
+            )
         
         console.print(criterios_table)
     

@@ -262,6 +262,40 @@ class StartupEvaluator:
         
         return result.output
     
+    def _validate_evaluation_consistency(self, avaliacao: AvaliacaoStartup) -> None:
+        """
+        Valida consistência da avaliação e alerta sobre inconsistências óbvias.
+        
+        Args:
+            avaliacao: Resultado da avaliação
+        """
+        # Verifica se critérios críticos foram reprovados mas a nota é alta
+        criterios = avaliacao.criterios_atendidos
+        
+        # Localização é critério eliminatório (KO criteria)
+        localizacao_atendida = criterios.localizacao.atendido
+        
+        if not localizacao_atendida and avaliacao.nota > 0:
+            logger.warning(
+                f"Inconsistência detectada: Startup não está no Brasil mas recebeu nota {avaliacao.nota}. "
+                f"Nota esperada seria 0 (critério eliminatório)."
+            )
+        
+        # Se a nota é alta (4-5) mas muitos critérios críticos não foram atendidos
+        criterios_criticos = [
+            criterios.localizacao,
+            criterios.estagio_adequado,
+            criterios.metricas_financeiro,
+        ]
+        
+        atendidos_criticos = sum(1 for c in criterios_criticos if c.atendido)
+        
+        if avaliacao.nota >= 4 and atendidos_criticos < 2:
+            logger.warning(
+                f"Inconsistência detectada: Nota alta ({avaliacao.nota}) mas apenas {atendidos_criticos}/3 "
+                f"critérios críticos atendidos. Revisar avaliação."
+            )
+    
     def _format_pdf_info(self, info: PitchDeckInfo) -> str:
         """Formata as informações do PDF para o prompt."""
         lines = []
@@ -288,6 +322,9 @@ class StartupEvaluator:
         
         # Passo 2: Avalia a startup
         avaliacao = self.evaluate_startup(pdf_info)
+        
+        # Validação de consistência (alerta se houver inconsistências óbvias)
+        self._validate_evaluation_consistency(avaliacao)
         
         # Obtém informações de uso
         usage = self.get_usage()

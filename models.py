@@ -36,21 +36,32 @@ class PitchDeckInfo(BaseModel):
     outras_informacoes: Optional[str] = Field(default=None, description="Outras informações relevantes")
 
 
+class CriterioAvaliado(BaseModel):
+    """Avaliação de um critério individual com evidência."""
+    atendido: bool = Field(description="Se o critério foi atendido ou não")
+    evidencia_encontrada: str = Field(description="Citação direta dos dados extraídos que justifica a decisão")
+
+
 class CriteriosAtendidos(BaseModel):
-    """Critérios avaliados pelo analista."""
-    localizacao: bool = Field(description="Startup está no Brasil")
-    estagio_adequado: bool = Field(description="Estágio compatível com a tese do fundo")
-    metricas_financeiro: bool = Field(description="Métricas financeiras adequadas para o estágio")
-    produto_tracao: bool = Field(description="Produto com tração comprovada")
-    equipe: bool = Field(description="Equipe qualificada e experiente")
+    """Critérios avaliados pelo analista com evidências."""
+    localizacao: CriterioAvaliado = Field(description="Startup está no Brasil")
+    estagio_adequado: CriterioAvaliado = Field(description="Estágio compatível com a tese do fundo")
+    metricas_financeiro: CriterioAvaliado = Field(description="Métricas financeiras adequadas para o estágio")
+    produto_tracao: CriterioAvaliado = Field(description="Produto com tração comprovada")
+    equipe: CriterioAvaliado = Field(description="Equipe qualificada e experiente")
 
 
 class AvaliacaoStartup(BaseModel):
     """Resultado da avaliação de uma startup."""
+    analise_preliminar: str = Field(
+        description="Análise passo a passo (Chain of Thought) comparando os dados extraídos com os critérios do fundo. "
+                   "Descreva primeiro a comparação dos dados antes de atribuir a nota final. "
+                   "Cite valores numéricos específicos e verifique se estão dentro das faixas esperadas."
+    )
     nota: int = Field(ge=0, le=5, description="Nota de 0 a 5")
     estagio_identificado: Estagio = Field(description="Estágio identificado da startup")
     justificativa: str = Field(description="Explicação detalhada da nota em 3-5 parágrafos")
     pontos_positivos: List[str] = Field(description="Lista de pontos positivos identificados")
     pontos_negativos: List[str] = Field(description="Lista de pontos negativos ou gaps")
-    criterios_atendidos: CriteriosAtendidos = Field(description="Critérios avaliados")
+    criterios_atendidos: CriteriosAtendidos = Field(description="Critérios avaliados com evidências")
 
