@@ -104,7 +104,12 @@ DIRETRIZES DE EXTRAÇÃO:
 - Se houver conflito (ex: receita de Seed mas pede rodada de Series A), priorize a métrica de Receita.
 
 5. CAMPOS ESPECÍFICOS
-- `tracao_metricas`: Liste KPIs chave (CAC, LTV, Churn, DAU/MAU) com datas.
+- `tracao_metricas`: Liste KPIs chave (CAC, LTV, Churn, DAU/MAU, NPS) com datas.
+- `mercado_tamanho`: Busque explicitamente por TAM, SAM, SOM e CAGR do mercado.
+- `modelo_negocio`: Identifique o tipo (B2B, B2C, Marketplace) e modelo de receita (SaaS, Transacional).
+- `diferencial_competitivo`: Busque menções a "Moat", "Patentes", "Efeito de Rede" ou vantagens injustas.
+- `clientes_atuais`: Liste nomes de clientes relevantes ou parceiros citados (busque slides de logos).
+- `equipe_fundadores`: Inclua também executivos chave e advisors relevantes.
 - `cap_table`: Procure termos como "post-money", "pre-money", "pool", "esop".
 """
 
